@@ -15,9 +15,9 @@ let contractAsSenderERC20Deployer,
 const createSigner = async () => {
   // Get a new signer
   signer = ethers.Wallet.createRandom();
-  // add the provider from Hardhat
+  // Add the provider from Hardhat
   signer = signer.connect(ethers.provider);
-  // send ETH to the new wallet so it can perform a tx
+  // Send ETH to the new wallet so it can perform a tx
   await deployer.sendTransaction({
     to: signer.address,
     value: ethers.utils.parseEther('1000'),
@@ -54,6 +54,7 @@ beforeEach(async () => {
   receiver1 = await createSigner();
   receiver2 = await createSigner();
   challenger = await createSigner();
+
   contractAsSenderERC20Deployer = erc20Mock.connect(sender);
   contractAsSignerSender = featureERC20.connect(sender);
   contractAsSignerReceiver = featureERC20.connect(receiver);
