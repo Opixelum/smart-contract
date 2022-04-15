@@ -26,7 +26,7 @@ const createSigner = async () => {
   return signer;
 };
 
-beforeEach(async function () {
+beforeEach(async () => {
   // Get the ContractFactory and Signers here.
   const ERC20Mock = await ethers.getContractFactory('ERC20Mock');
   const FeatureERC20 = await ethers.getContractFactory('FeatureERC20');
@@ -90,8 +90,8 @@ afterEach(async () => {
   });
 });
 
-describe('Feature ERC20', function () {
-  it('Should pay the receiver after a claim and a payment', async function () {
+describe('Feature ERC20', () => {
+  it('Should pay the receiver after a claim and a payment', async () => {
     const createTransferTx = await contractAsSignerERC20Deployer.transfer(
       sender.address,
       100,
@@ -159,7 +159,7 @@ describe('Feature ERC20', function () {
     );
   });
 
-  it('Should refund the money to the sender after a timeout payment without any claim', async function () {
+  it('Should refund the money to the sender after a timeout payment without any claim', async () => {
     const createTransferTx = await contractAsSignerERC20Deployer.transfer(
       sender.address,
       100,
@@ -203,7 +203,7 @@ describe('Feature ERC20', function () {
     );
   });
 
-  it('Should revert the refund to the sender if the timeout payment is not passed', async function () {
+  it('Should revert the refund to the sender if the timeout payment is not passed', async () => {
     const createTransferTx = await contractAsSignerERC20Deployer.transfer(
       sender.address,
       100,
@@ -251,7 +251,7 @@ describe('Feature ERC20', function () {
     );
   });
 
-  it('Should revert the refund to the sender if there is any claim', async function () {
+  it('Should revert the refund to the sender if there is any claim', async () => {
     const createTransferTx = await contractAsSignerERC20Deployer.transfer(
       sender.address,
       100,
@@ -299,7 +299,7 @@ describe('Feature ERC20', function () {
     );
   });
 
-  it('Should give the arbitration fee and the total deposit to the challenger after a successful challenge', async function () {
+  it('Should give the arbitration fee and the total deposit to the challenger after a successful challenge', async () => {
     const createTransferTx = await contractAsSignerERC20Deployer.transfer(
       sender.address,
       100,
@@ -381,7 +381,7 @@ describe('Feature ERC20', function () {
     );
   });
 
-  it('Should give the amount of the total deposit to the claimer after a aborted challenge', async function () {
+  it('Should give the amount of the total deposit to the claimer after a aborted challenge', async () => {
     const createTransferTx = await contractAsSignerERC20Deployer.transfer(
       sender.address,
       100,
@@ -458,7 +458,7 @@ describe('Feature ERC20', function () {
     );
   });
 
-  it('Should give the amount of the total deposit to the claimer after a successful appeal', async function () {
+  it('Should give the amount of the total deposit to the claimer after a successful appeal', async () => {
     const createTransferTx = await contractAsSignerERC20Deployer.transfer(
       sender.address,
       100,
@@ -561,7 +561,7 @@ describe('Feature ERC20', function () {
   });
 
   // Scenario: 2 claimers, the first one get the reward.
-  it('Should give the amount of the first claimer who claim in multiple successful claims', async function () {
+  it('Should give the amount of the first claimer who claim in multiple successful claims', async () => {
     const createTransferTx = await contractAsSignerERC20Deployer.transfer(
       sender.address,
       100,
