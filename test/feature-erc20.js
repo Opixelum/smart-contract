@@ -2,27 +2,22 @@ const { expect } = require('chai');
 
 const provider = ethers.provider;
 let erc20Mock, featureERC20, feature, arbitrator;
-let deployer,
-  sender0,
-  receiver0,
-  sender1,
-  receiver1,
-  sender2,
-  receiver2,
-  sender3,
-  receiver3,
-  sender4,
-  receiver4,
-  challenger0,
-  sender5,
-  receiver5,
-  challenger1,
-  sender6,
-  receiver6,
-  challenger2,
-  sender7,
-  receiver7;
-let contractAsSignerDeployer, contractAsSignerSender0;
+let deployer;
+let contractAsSignerDeployer;
+
+const createSigner = async () => {
+  // Get a new signer
+  signer = ethers.Wallet.createRandom();
+  // add the provider from Hardhat
+  signer = signer.connect(ethers.provider);
+  // send ETH to the new wallet so it can perform a tx
+  await deployer.sendTransaction({
+    to: signer.address,
+    value: ethers.utils.parseEther('1000'),
+  });
+
+  return signer;
+};
 
 beforeEach(async function () {
   // Get the ContractFactory and Signers here.
@@ -32,28 +27,7 @@ beforeEach(async function () {
     'CentralizedAppealableArbitrator',
   );
 
-  [
-    deployer,
-    sender0,
-    receiver0,
-    sender1,
-    receiver1,
-    sender2,
-    receiver2,
-    sender3,
-    receiver3,
-    sender4,
-    receiver4,
-    challenger0,
-    sender5,
-    receiver5,
-    challenger1,
-    sender6,
-    receiver6,
-    challenger2,
-    sender7,
-    receiver7,
-  ] = await ethers.getSigners();
+  [deployer] = await ethers.getSigners();
 
   featureERC20 = await FeatureERC20.deploy();
   arbitrator = await CentralizedArbitrator.deploy('20000000000000000', '42'); // 0.02 ether, 42s
@@ -64,36 +38,7 @@ beforeEach(async function () {
   await arbitrator.deployed();
 
   contractAsSignerERC20Deployer = erc20Mock.connect(deployer);
-  contractAsSender0ERC20Deployer = erc20Mock.connect(sender0);
-  contractAsSender1ERC20Deployer = erc20Mock.connect(sender1);
-  contractAsSender2ERC20Deployer = erc20Mock.connect(sender2);
-  contractAsSender3ERC20Deployer = erc20Mock.connect(sender3);
-  contractAsSender4ERC20Deployer = erc20Mock.connect(sender4);
-  contractAsSender5ERC20Deployer = erc20Mock.connect(sender5);
-  contractAsSender6ERC20Deployer = erc20Mock.connect(sender6);
-  contractAsSender7ERC20Deployer = erc20Mock.connect(sender7);
-
   contractAsSignerDeployer = featureERC20.connect(deployer);
-  contractAsSignerSender0 = featureERC20.connect(sender0);
-  contractAsSignerReceiver0 = featureERC20.connect(receiver0);
-  contractAsSignerSender1 = featureERC20.connect(sender1);
-  contractAsSignerReceiver1 = featureERC20.connect(receiver1);
-  contractAsSignerSender2 = featureERC20.connect(sender2);
-  contractAsSignerReceiver2 = featureERC20.connect(receiver2);
-  contractAsSignerSender3 = featureERC20.connect(sender3);
-  contractAsSignerReceiver3 = featureERC20.connect(receiver3);
-  contractAsSignerSender4 = featureERC20.connect(sender4);
-  contractAsSignerReceiver4 = featureERC20.connect(receiver4);
-  contractAsSignerChallenger0 = featureERC20.connect(challenger0);
-  contractAsSignerSender5 = featureERC20.connect(sender5);
-  contractAsSignerReceiver5 = featureERC20.connect(receiver5);
-  contractAsSignerChallenger1 = featureERC20.connect(challenger1);
-  contractAsSignerSender6 = featureERC20.connect(sender6);
-  contractAsSignerReceiver6 = featureERC20.connect(receiver6);
-  contractAsSignerChallenger2 = featureERC20.connect(challenger2);
-  contractAsSignerSender7 = featureERC20.connect(sender7);
-  contractAsSignerReceiver7 = featureERC20.connect(receiver7);
-
   contractAsSignerJuror = arbitrator.connect(deployer);
 
   const initializeTx = await contractAsSignerDeployer.initialize();
@@ -101,19 +46,25 @@ beforeEach(async function () {
 
 describe('Feature ERC20', function () {
   it('Should pay the receiver after a claim and a payment', async function () {
+    const sender = await createSigner();
+    const receiver = await createSigner();
+    const contractAsSenderERC20Deployer = erc20Mock.connect(sender);
+    const contractAsSignerSender = featureERC20.connect(sender);
+    const contractAsSignerReceiver = featureERC20.connect(receiver);
+
     const createTransferTx = await contractAsSignerERC20Deployer.transfer(
-      sender0.address,
+      sender.address,
       100,
     );
 
-    expect(await erc20Mock.balanceOf(sender0.address)).to.equal(100);
+    expect(await erc20Mock.balanceOf(sender.address)).to.equal(100);
 
-    const createAllowERC20Tx = await contractAsSender0ERC20Deployer.approve(
+    const createAllowERC20Tx = await contractAsSenderERC20Deployer.approve(
       featureERC20.address,
       100,
     );
 
-    const createTransactionTx = await contractAsSignerSender0.createTransaction(
+    const createTransactionTx = await contractAsSignerSender.createTransaction(
       arbitrator.address,
       0x00,
       erc20Mock.address,
@@ -126,11 +77,11 @@ describe('Feature ERC20', function () {
 
     expect(await erc20Mock.balanceOf(featureERC20.address)).to.equal(100);
     expect((await featureERC20.transactions(0)).sender).to.equal(
-      sender0.address,
+      sender.address,
     );
     expect((await featureERC20.transactions(0)).delayClaim).to.equal('259200');
 
-    const claimTx = await contractAsSignerReceiver0.claim(
+    const claimTx = await contractAsSignerReceiver.claim(
       0, // _transactionID
       {
         value: '120000000000000000', // 0.12eth
@@ -157,29 +108,44 @@ describe('Feature ERC20', function () {
     );
 
     const newBalanceReceiverExpected = new ethers.BigNumber.from(
-      '10000000000000000000000',
+      '1000000000000000000000',
     ).sub(gasFeeClaimTx);
 
-    expect((await provider.getBalance(receiver0.address)).toString()).to.equal(
+    expect((await provider.getBalance(receiver.address)).toString()).to.equal(
       newBalanceReceiverExpected.toString(),
     );
-    expect((await erc20Mock.balanceOf(receiver0.address)).toString()).to.equal(
+    expect((await erc20Mock.balanceOf(receiver.address)).toString()).to.equal(
       '100',
     );
+
+    // Give back deployer unused ether
+    await sender.sendTransaction({
+      to: deployer.address,
+      value: ethers.utils.parseEther('900'),
+    });
+
+    await receiver.sendTransaction({
+      to: deployer.address,
+      value: ethers.utils.parseEther('900'),
+    });
   });
 
   it('Should refund the money to the sender after a timeout payment without any claim', async function () {
+    const sender = await createSigner();
+    const contractAsSenderERC20Deployer = erc20Mock.connect(sender);
+    const contractAsSignerSender = featureERC20.connect(sender);
+
     const createTransferTx = await contractAsSignerERC20Deployer.transfer(
-      sender1.address,
+      sender.address,
       100,
     );
 
-    const createAllowERC20Tx = await contractAsSender1ERC20Deployer.approve(
+    const createAllowERC20Tx = await contractAsSenderERC20Deployer.approve(
       featureERC20.address,
       100,
     );
 
-    const createTransactionTx = await contractAsSignerSender1.createTransaction(
+    const createTransactionTx = await contractAsSignerSender.createTransaction(
       arbitrator.address,
       0x00,
       erc20Mock.address,
@@ -191,7 +157,7 @@ describe('Feature ERC20', function () {
     );
 
     expect((await featureERC20.transactions(0)).sender).to.equal(
-      sender1.address,
+      sender.address,
     );
 
     // Wait until the transaction is mined
@@ -207,23 +173,35 @@ describe('Feature ERC20', function () {
       0, // _transactionID
     );
 
-    expect((await erc20Mock.balanceOf(sender1.address)).toString()).to.equal(
+    expect((await erc20Mock.balanceOf(sender.address)).toString()).to.equal(
       '100',
     );
+
+    // Give back deployer unused ether
+    await sender.sendTransaction({
+      to: deployer.address,
+      value: ethers.utils.parseEther('900'),
+    });
   });
 
   it('Should revert the refund to the sender if the timeout payment is not passed', async function () {
+    const sender = await createSigner();
+    const receiver = await createSigner();
+    const contractAsSenderERC20Deployer = erc20Mock.connect(sender);
+    const contractAsSignerSender = featureERC20.connect(sender);
+    const contractAsSignerReceiver = featureERC20.connect(receiver);
+
     const createTransferTx = await contractAsSignerERC20Deployer.transfer(
-      sender2.address,
+      sender.address,
       100,
     );
 
-    const createAllowERC20Tx = await contractAsSender2ERC20Deployer.approve(
+    const createAllowERC20Tx = await contractAsSenderERC20Deployer.approve(
       featureERC20.address,
       100,
     );
 
-    const createTransactionTx = await contractAsSignerSender2.createTransaction(
+    const createTransactionTx = await contractAsSignerSender.createTransaction(
       arbitrator.address,
       0x00,
       erc20Mock.address,
@@ -235,7 +213,7 @@ describe('Feature ERC20', function () {
     );
 
     expect((await featureERC20.transactions(0)).sender).to.equal(
-      sender2.address,
+      sender.address,
     );
 
     // Wait until the transaction is mined
@@ -244,7 +222,7 @@ describe('Feature ERC20', function () {
       .valueOf()
       .mul(150000000000);
 
-    const claimTx = await contractAsSignerReceiver1.claim(
+    const claimTx = await contractAsSignerReceiver.claim(
       0, // _transactionID
       {
         value: '120000000000000000', // 0.12eth
@@ -258,20 +236,37 @@ describe('Feature ERC20', function () {
     await expect(contractAsSignerDeployer.refund(0)).to.be.revertedWith(
       'The timeout payment should be passed.',
     );
+
+    // Give back deployer unused ether
+    await sender.sendTransaction({
+      to: deployer.address,
+      value: ethers.utils.parseEther('900'),
+    });
+
+    await receiver.sendTransaction({
+      to: deployer.address,
+      value: ethers.utils.parseEther('900'),
+    });
   });
 
   it('Should revert the refund to the sender if there is any claim', async function () {
+    const sender = await createSigner();
+    const receiver = await createSigner();
+    const contractAsSenderERC20Deployer = erc20Mock.connect(sender);
+    const contractAsSignerSender = featureERC20.connect(sender);
+    const contractAsSignerReceiver = featureERC20.connect(receiver);
+
     const createTransferTx = await contractAsSignerERC20Deployer.transfer(
-      sender3.address,
+      sender.address,
       100,
     );
 
-    const createAllowERC20Tx = await contractAsSender3ERC20Deployer.approve(
+    const createAllowERC20Tx = await contractAsSenderERC20Deployer.approve(
       featureERC20.address,
       100,
     );
 
-    const createTransactionTx = await contractAsSignerSender3.createTransaction(
+    const createTransactionTx = await contractAsSignerSender.createTransaction(
       arbitrator.address,
       0x00,
       erc20Mock.address,
@@ -283,7 +278,7 @@ describe('Feature ERC20', function () {
     );
 
     expect((await featureERC20.transactions(0)).sender).to.equal(
-      sender3.address,
+      sender.address,
     );
 
     // Wait until the transaction is mined
@@ -292,7 +287,7 @@ describe('Feature ERC20', function () {
       .valueOf()
       .mul(150000000000);
 
-    const claimTx = await contractAsSignerReceiver2.claim(
+    const claimTx = await contractAsSignerReceiver.claim(
       0, // _transactionID
       {
         value: '120000000000000000', // 0.12eth
@@ -306,20 +301,39 @@ describe('Feature ERC20', function () {
     await expect(contractAsSignerDeployer.refund(0)).to.be.revertedWith(
       'The transaction should not to have running claims.',
     );
+
+    // Give back deployer unused ether
+    await sender.sendTransaction({
+      to: deployer.address,
+      value: ethers.utils.parseEther('900'),
+    });
+
+    await receiver.sendTransaction({
+      to: deployer.address,
+      value: ethers.utils.parseEther('900'),
+    });
   });
 
   it('Should give the arbitration fee and the total deposit to the challenger after a successful challenge', async function () {
+    const sender = await createSigner();
+    const receiver = await createSigner();
+    const challenger = await createSigner();
+    const contractAsSenderERC20Deployer = erc20Mock.connect(sender);
+    const contractAsSignerSender = featureERC20.connect(sender);
+    const contractAsSignerReceiver = featureERC20.connect(receiver);
+    const contractAsSignerChallenger = featureERC20.connect(challenger);
+
     const createTransferTx = await contractAsSignerERC20Deployer.transfer(
-      sender4.address,
+      sender.address,
       100,
     );
 
-    const createAllowERC20Tx = await contractAsSender4ERC20Deployer.approve(
+    const createAllowERC20Tx = await contractAsSenderERC20Deployer.approve(
       featureERC20.address,
       100,
     );
 
-    const createTransactionTx = await contractAsSignerSender4.createTransaction(
+    const createTransactionTx = await contractAsSignerSender.createTransaction(
       arbitrator.address,
       0x00,
       erc20Mock.address,
@@ -331,11 +345,11 @@ describe('Feature ERC20', function () {
     );
 
     expect((await featureERC20.transactions(0)).sender).to.equal(
-      sender4.address,
+      sender.address,
     );
 
     // Claim
-    const claimTx = await contractAsSignerReceiver3.claim(
+    const claimTx = await contractAsSignerReceiver.claim(
       0, // _transactionID
       {
         value: '120000000000000000', // 0.12eth
@@ -344,7 +358,7 @@ describe('Feature ERC20', function () {
     );
 
     // Challenge claim
-    const challengeClaimTx = await contractAsSignerChallenger0.challengeClaim(
+    const challengeClaimTx = await contractAsSignerChallenger.challengeClaim(
       0, // _claimID
       {
         value: '120000000000000000', // 0.12eth
@@ -379,33 +393,57 @@ describe('Feature ERC20', function () {
     // Claim status switch to Resolved.
     expect(parseInt(claim.status)).to.equal(2);
 
-    const newBalanceChallenger0Expected = new ethers.BigNumber.from(
-      '10000000000000000000000',
+    const newBalanceChallengerExpected = new ethers.BigNumber.from(
+      '1000000000000000000000',
     )
       .sub(gasFeeChallengeClaimTx)
       .add('100000000000000000');
 
-    expect(
-      (await provider.getBalance(challenger0.address)).toString(),
-    ).to.equal(newBalanceChallenger0Expected.toString());
+    expect((await provider.getBalance(challenger.address)).toString()).to.equal(
+      newBalanceChallengerExpected.toString(),
+    );
+
+    // Give back deployer unused ether
+    await sender.sendTransaction({
+      to: deployer.address,
+      value: ethers.utils.parseEther('900'),
+    });
+
+    await receiver.sendTransaction({
+      to: deployer.address,
+      value: ethers.utils.parseEther('900'),
+    });
+
+    await challenger.sendTransaction({
+      to: deployer.address,
+      value: ethers.utils.parseEther('900'),
+    });
   });
 
   it('Should give the amount of the total deposit to the claimer after a aborted challenge', async function () {
+    const sender = await createSigner();
+    const receiver = await createSigner();
+    const challenger = await createSigner();
+    const contractAsSenderERC20Deployer = erc20Mock.connect(sender);
+    const contractAsSignerSender = featureERC20.connect(sender);
+    const contractAsSignerReceiver = featureERC20.connect(receiver);
+    const contractAsSignerChallenger = featureERC20.connect(challenger);
+
     const createTransferTx = await contractAsSignerERC20Deployer.transfer(
-      sender5.address,
+      sender.address,
       100,
     );
 
     await createTransferTx.wait();
 
-    const createAllowERC20Tx = await contractAsSender5ERC20Deployer.approve(
+    const createAllowERC20Tx = await contractAsSenderERC20Deployer.approve(
       featureERC20.address,
       100,
     );
 
     await createAllowERC20Tx.wait();
 
-    const createTransactionTx = await contractAsSignerSender5.createTransaction(
+    const createTransactionTx = await contractAsSignerSender.createTransaction(
       arbitrator.address,
       0x00,
       erc20Mock.address,
@@ -417,7 +455,7 @@ describe('Feature ERC20', function () {
     );
 
     // Claim
-    const claimTx = await contractAsSignerReceiver4.claim(
+    const claimTx = await contractAsSignerReceiver.claim(
       0, // _transactionID
       {
         value: '120000000000000000', // 0.12eth
@@ -433,7 +471,7 @@ describe('Feature ERC20', function () {
       .mul(150000000000);
 
     // Challenge claim
-    const challengeClaimTx = await contractAsSignerChallenger1.challengeClaim(
+    const challengeClaimTx = await contractAsSignerChallenger.challengeClaim(
       0, // _claimID
       {
         value: '120000000000000000', // 0.12eth
@@ -456,33 +494,57 @@ describe('Feature ERC20', function () {
       1, // Ruling for the receiver
     );
 
-    const newBalanceReceiver4Expected = new ethers.BigNumber.from(
-      '10000000000000000000000',
+    const newBalanceReceiverExpected = new ethers.BigNumber.from(
+      '1000000000000000000000',
     )
       .sub(gasFeeClaimTx)
       .sub('20000000000000000');
 
-    expect((await provider.getBalance(receiver4.address)).toString()).to.equal(
-      newBalanceReceiver4Expected.toString(),
+    expect((await provider.getBalance(receiver.address)).toString()).to.equal(
+      newBalanceReceiverExpected.toString(),
     );
+
+    // Give back deployer unused ether
+    await sender.sendTransaction({
+      to: deployer.address,
+      value: ethers.utils.parseEther('900'),
+    });
+
+    await receiver.sendTransaction({
+      to: deployer.address,
+      value: ethers.utils.parseEther('900'),
+    });
+
+    await challenger.sendTransaction({
+      to: deployer.address,
+      value: ethers.utils.parseEther('900'),
+    });
   });
 
   it('Should give the amount of the total deposit to the claimer after a successful appeal', async function () {
+    const sender = await createSigner();
+    const receiver = await createSigner();
+    const challenger = await createSigner();
+    const contractAsSenderERC20Deployer = erc20Mock.connect(sender);
+    const contractAsSignerSender = featureERC20.connect(sender);
+    const contractAsSignerReceiver = featureERC20.connect(receiver);
+    const contractAsSignerChallenger = featureERC20.connect(challenger);
+
     const createTransferTx = await contractAsSignerERC20Deployer.transfer(
-      sender6.address,
+      sender.address,
       100,
     );
 
     await createTransferTx.wait();
 
-    const createAllowERC20Tx = await contractAsSender6ERC20Deployer.approve(
+    const createAllowERC20Tx = await contractAsSenderERC20Deployer.approve(
       featureERC20.address,
       100,
     );
 
     await createAllowERC20Tx.wait();
 
-    const createTransactionTx = await contractAsSignerSender6.createTransaction(
+    const createTransactionTx = await contractAsSignerSender.createTransaction(
       arbitrator.address,
       0x00,
       erc20Mock.address,
@@ -494,7 +556,7 @@ describe('Feature ERC20', function () {
     );
 
     // Claim
-    const claimTx = await contractAsSignerReceiver5.claim(
+    const claimTx = await contractAsSignerReceiver.claim(
       0, // _transactionID
       {
         value: '120000000000000000', // 0.12eth
@@ -510,7 +572,7 @@ describe('Feature ERC20', function () {
       .mul(150000000000);
 
     // Challenge claim
-    const challengeClaimTx = await contractAsSignerChallenger2.challengeClaim(
+    const challengeClaimTx = await contractAsSignerChallenger.challengeClaim(
       0, // _claimID
       {
         value: '120000000000000000', // 0.12eth
@@ -527,7 +589,7 @@ describe('Feature ERC20', function () {
     );
 
     // Appeal
-    const appealTx = await contractAsSignerReceiver5.appeal(
+    const appealTx = await contractAsSignerReceiver.appeal(
       0, // _claimID
       {
         value: '20000000000000000', // 0.2eth
@@ -557,35 +619,59 @@ describe('Feature ERC20', function () {
     expect((await contractAsSignerJuror.disputes(0)).status).to.equal(2);
     expect((await contractAsSignerJuror.disputes(0)).ruling).to.equal(1);
 
-    const newBalanceReceiver5Expected = new ethers.BigNumber.from(
-      '10000000000000000000000',
+    const newBalanceReceiverExpected = new ethers.BigNumber.from(
+      '1000000000000000000000',
     )
       .sub(gasFeeClaimTx)
       .sub(gasFeeAppealTx)
       .sub('40000000000000000');
 
-    expect((await provider.getBalance(receiver5.address)).toString()).to.equal(
-      newBalanceReceiver5Expected.toString(),
+    expect((await provider.getBalance(receiver.address)).toString()).to.equal(
+      newBalanceReceiverExpected.toString(),
     );
+
+    // Give back deployer unused ether
+    await sender.sendTransaction({
+      to: deployer.address,
+      value: ethers.utils.parseEther('900'),
+    });
+
+    await receiver.sendTransaction({
+      to: deployer.address,
+      value: ethers.utils.parseEther('900'),
+    });
+
+    await challenger.sendTransaction({
+      to: deployer.address,
+      value: ethers.utils.parseEther('900'),
+    });
   });
 
   // Scenario: 2 claimers, the first one get the reward.
   it('Should give the amount of the first claimer who claim in multiple successful claims', async function () {
+    const sender = await createSigner();
+    const receiver1 = await createSigner();
+    const receiver2 = await createSigner();
+    const contractAsSenderERC20Deployer = erc20Mock.connect(sender);
+    const contractAsSignerSender = featureERC20.connect(sender);
+    const contractAsSignerReceiver1 = featureERC20.connect(receiver1);
+    const contractAsSignerReceiver2 = featureERC20.connect(receiver2);
+
     const createTransferTx = await contractAsSignerERC20Deployer.transfer(
-      sender7.address,
+      sender.address,
       100,
     );
 
     await createTransferTx.wait();
 
-    const createAllowERC20Tx = await contractAsSender7ERC20Deployer.approve(
+    const createAllowERC20Tx = await contractAsSenderERC20Deployer.approve(
       featureERC20.address,
       100,
     );
 
     await createAllowERC20Tx.wait();
 
-    const createTransactionTx = await contractAsSignerSender7.createTransaction(
+    const createTransactionTx = await contractAsSignerSender.createTransaction(
       arbitrator.address,
       0x00,
       erc20Mock.address,
@@ -597,7 +683,7 @@ describe('Feature ERC20', function () {
     );
 
     // 1st claim
-    const claimTx1 = await contractAsSignerReceiver6.claim(
+    const claimTx1 = await contractAsSignerReceiver1.claim(
       0, // _transactionID
       {
         value: '120000000000000000', // 0.12eth
@@ -612,7 +698,7 @@ describe('Feature ERC20', function () {
       .mul(150000000000);
 
     // 2nd claim
-    const claimTx2 = await contractAsSignerReceiver7.claim(
+    const claimTx2 = await contractAsSignerReceiver2.claim(
       0, // _transactionID
       {
         value: '120000000000000000', // 0.12eth
@@ -635,24 +721,40 @@ describe('Feature ERC20', function () {
       0, // _claimID
     );
 
-    const newBalanceReceiver6Expected = new ethers.BigNumber.from(
-      '10000000000000000000000',
+    const newBalanceReceiver1Expected = new ethers.BigNumber.from(
+      '1000000000000000000000',
     ).sub(gasFeeClaimTx1);
 
-    const newBalanceReceiver7Expected = new ethers.BigNumber.from(
-      '10000000000000000000000',
+    const newBalanceReceiver2Expected = new ethers.BigNumber.from(
+      '1000000000000000000000',
     )
       .sub(gasFeeClaimTx2)
       .sub(ethers.BigNumber.from('120000000000000000')); // Claim value
 
     // First claimer should receive the payment
-    expect((await provider.getBalance(receiver6.address)).toString()).to.equal(
-      newBalanceReceiver6Expected.toString(),
+    expect((await provider.getBalance(receiver1.address)).toString()).to.equal(
+      newBalanceReceiver1Expected.toString(),
     );
 
     // Second claimer must not receive the payment
-    expect((await provider.getBalance(receiver7.address)).toString()).to.equal(
-      newBalanceReceiver7Expected.toString(),
+    expect((await provider.getBalance(receiver2.address)).toString()).to.equal(
+      newBalanceReceiver2Expected.toString(),
     );
+
+    // Give back deployer unused ether
+    await sender.sendTransaction({
+      to: deployer.address,
+      value: ethers.utils.parseEther('900'),
+    });
+
+    await receiver1.sendTransaction({
+      to: deployer.address,
+      value: ethers.utils.parseEther('900'),
+    });
+
+    await receiver2.sendTransaction({
+      to: deployer.address,
+      value: ethers.utils.parseEther('900'),
+    });
   });
 });
