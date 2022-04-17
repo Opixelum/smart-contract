@@ -31,7 +31,7 @@ beforeEach(async () => {
   const ERC20Mock = await ethers.getContractFactory('ERC20Mock');
   const FeatureERC20 = await ethers.getContractFactory('FeatureERC20');
   const CentralizedArbitrator = await ethers.getContractFactory(
-    'CentralizedAppealableArbitrator',
+    'CentralizedArbitratorERC20',
   );
 
   featureERC20 = await FeatureERC20.deploy();
