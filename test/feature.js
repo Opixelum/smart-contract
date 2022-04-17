@@ -2,27 +2,27 @@ const { expect } = require('chai');
 
 const provider = ethers.provider;
 let feature, arbitrator;
-let deployer,
-  sender0,
-  receiver0,
-  sender1,
-  receiver1,
-  sender2,
-  receiver2,
-  sender3,
-  receiver3,
-  sender4,
-  receiver4,
-  challenger0,
-  sender5,
-  receiver5,
-  challenger1,
-  sender6,
-  receiver6,
-  challenger2,
-  sender7,
-  receiver7;
-let contractAsSignerDeployer, contractAsSignerSender0;
+let contractAsSignerDeployer;
+let sender, receiver, receiver1, receiver2, challenger;
+let contractAsSignerSender,
+  contractAsSignerReceiver,
+  contractAsSignerReceiver1,
+  contractAsSignerReceiver2,
+  contractAsSignerChallenger;
+
+const createSigner = async () => {
+  // Get a new signer
+  signer = ethers.Wallet.createRandom();
+  // Add the provider from Hardhat
+  signer = signer.connect(ethers.provider);
+  // Send ETH to the new wallet so it can perform a tx
+  await deployer.sendTransaction({
+    to: signer.address,
+    value: ethers.utils.parseEther('1000'),
+  });
+
+  return signer;
+};
 
 beforeEach(async function () {
   // Get the ContractFactory and Signers here.
@@ -32,64 +32,62 @@ beforeEach(async function () {
     'CentralizedAppealableArbitrator',
   );
 
-  [
-    deployer,
-    sender0,
-    receiver0,
-    sender1,
-    receiver1,
-    sender2,
-    receiver2,
-    sender3,
-    receiver3,
-    sender4,
-    receiver4,
-    challenger0,
-    sender5,
-    receiver5,
-    challenger1,
-    sender6,
-    receiver6,
-    challenger2,
-    sender7,
-    receiver7,
-  ] = await ethers.getSigners();
-
   feature = await Feature.deploy();
   arbitrator = await CentralizedArbitrator.deploy('20000000000000000', '42'); // 0.02 ether, 42s
 
   await feature.deployed();
   await arbitrator.deployed();
 
+  [deployer] = await ethers.getSigners();
   contractAsSignerDeployer = feature.connect(deployer);
-  contractAsSignerSender0 = feature.connect(sender0);
-  contractAsSignerReceiver0 = feature.connect(receiver0);
-  contractAsSignerSender1 = feature.connect(sender1);
-  contractAsSignerReceiver1 = feature.connect(receiver1);
-  contractAsSignerSender2 = feature.connect(sender2);
-  contractAsSignerReceiver2 = feature.connect(receiver2);
-  contractAsSignerSender3 = feature.connect(sender3);
-  contractAsSignerReceiver3 = feature.connect(receiver3);
-  contractAsSignerSender4 = feature.connect(sender4);
-  contractAsSignerReceiver4 = feature.connect(receiver4);
-  contractAsSignerChallenger0 = feature.connect(challenger0);
-  contractAsSignerSender5 = feature.connect(sender5);
-  contractAsSignerReceiver5 = feature.connect(receiver5);
-  contractAsSignerChallenger1 = feature.connect(challenger1);
-  contractAsSignerSender6 = feature.connect(sender6);
-  contractAsSignerReceiver6 = feature.connect(receiver6);
-  contractAsSignerChallenger2 = feature.connect(challenger2);
-  contractAsSignerSender7 = feature.connect(sender7);
-  contractAsSignerReceiver7 = feature.connect(receiver7);
-
   contractAsSignerJuror = arbitrator.connect(deployer);
 
   const initializeTx = await contractAsSignerDeployer.initialize();
+
+  sender = await createSigner();
+  receiver = await createSigner();
+  receiver1 = await createSigner();
+  receiver2 = await createSigner();
+  challenger = await createSigner();
+
+  contractAsSignerSender = feature.connect(sender);
+  contractAsSignerReceiver = feature.connect(receiver);
+  contractAsSignerReceiver1 = feature.connect(receiver1);
+  contractAsSignerReceiver2 = feature.connect(receiver2);
+  contractAsSignerChallenger = feature.connect(challenger);
+});
+
+afterEach(async () => {
+  // Give back deployer unused ether
+  await sender.sendTransaction({
+    to: deployer.address,
+    value: ethers.utils.parseEther('990'),
+  });
+
+  await receiver.sendTransaction({
+    to: deployer.address,
+    value: ethers.utils.parseEther('990'),
+  });
+
+  await receiver1.sendTransaction({
+    to: deployer.address,
+    value: ethers.utils.parseEther('990'),
+  });
+
+  await receiver2.sendTransaction({
+    to: deployer.address,
+    value: ethers.utils.parseEther('990'),
+  });
+
+  await challenger.sendTransaction({
+    to: deployer.address,
+    value: ethers.utils.parseEther('990'),
+  });
 });
 
 describe('Feature', function () {
   it('Should pay the receiver after a claim and a payment', async function () {
-    const createTransactionTx = await contractAsSignerSender0.createTransaction(
+    const createTransactionTx = await contractAsSignerSender.createTransaction(
       arbitrator.address,
       0x00,
       '100000000000000000', // _deposit for claim : 0.1eth => 10% of amount
@@ -101,10 +99,10 @@ describe('Feature', function () {
       },
     );
 
-    expect((await feature.transactions(0)).sender).to.equal(sender0.address);
+    expect((await feature.transactions(0)).sender).to.equal(sender.address);
     expect((await feature.transactions(0)).delayClaim).to.equal('259200');
 
-    const claimTx = await contractAsSignerReceiver0.claim(
+    const claimTx = await contractAsSignerReceiver.claim(
       0, // _transactionID
       {
         value: '120000000000000000', // 0.12eth
@@ -131,16 +129,18 @@ describe('Feature', function () {
     );
 
     const newBalanceReceiverExpected = new ethers.BigNumber.from(
-      '10001000000000000000000',
-    ).sub(gasFeeClaimTx);
+      '1000100000000000000000',
+    )
+    .add('900000000000000000')
+    .sub(gasFeeClaimTx);
 
-    expect((await provider.getBalance(receiver0.address)).toString()).to.equal(
+    expect((await provider.getBalance(receiver.address)).toString()).to.equal(
       newBalanceReceiverExpected.toString(),
     );
   });
 
   it('Should refund the money to the sender after a timeout payment without any claim', async function () {
-    const createTransactionTx = await contractAsSignerSender1.createTransaction(
+    const createTransactionTx = await contractAsSignerSender.createTransaction(
       arbitrator.address,
       0x00,
       '100000000000000000', // _deposit for claim : 0.1eth => 10% of amount
@@ -153,7 +153,7 @@ describe('Feature', function () {
       },
     );
 
-    expect((await feature.transactions(0)).sender).to.equal(sender1.address);
+    expect((await feature.transactions(0)).sender).to.equal(sender.address);
 
     // Wait until the transaction is mined
     const transactionMinedClaimTx = await createTransactionTx.wait();
@@ -169,16 +169,16 @@ describe('Feature', function () {
     );
 
     const newBalanceSenderExpected = new ethers.BigNumber.from(
-      '10000000000000000000000',
+      '1000000000000000000000',
     ).sub(gasFeeCreateTransactionTx);
 
-    expect((await provider.getBalance(sender1.address)).toString()).to.equal(
+    expect((await provider.getBalance(sender.address)).toString()).to.equal(
       newBalanceSenderExpected.toString(),
     );
   });
 
   it('Should revert the refund to the sender if the timeout payment is not passed', async function () {
-    const createTransactionTx = await contractAsSignerSender2.createTransaction(
+    const createTransactionTx = await contractAsSignerSender.createTransaction(
       arbitrator.address,
       0x00,
       '100000000000000000', // _deposit for claim : 0.1eth => 10% of amount
@@ -191,7 +191,7 @@ describe('Feature', function () {
       },
     );
 
-    expect((await feature.transactions(0)).sender).to.equal(sender2.address);
+    expect((await feature.transactions(0)).sender).to.equal(sender.address);
 
     // Wait until the transaction is mined
     const transactionMinedClaimTx = await createTransactionTx.wait();
@@ -199,7 +199,7 @@ describe('Feature', function () {
       .valueOf()
       .mul(150000000000);
 
-    const claimTx = await contractAsSignerReceiver1.claim(
+    const claimTx = await contractAsSignerReceiver.claim(
       0, // _transactionID
       {
         value: '120000000000000000', // 0.12eth
@@ -216,7 +216,7 @@ describe('Feature', function () {
   });
 
   it('Should revert the refund to the sender if there is any claim', async function () {
-    const createTransactionTx = await contractAsSignerSender3.createTransaction(
+    const createTransactionTx = await contractAsSignerSender.createTransaction(
       arbitrator.address,
       0x00,
       '100000000000000000', // _deposit for claim : 0.1eth => 10% of amount
@@ -229,7 +229,7 @@ describe('Feature', function () {
       },
     );
 
-    expect((await feature.transactions(0)).sender).to.equal(sender3.address);
+    expect((await feature.transactions(0)).sender).to.equal(sender.address);
 
     // Wait until the transaction is mined
     const transactionMinedClaimTx = await createTransactionTx.wait();
@@ -237,7 +237,7 @@ describe('Feature', function () {
       .valueOf()
       .mul(150000000000);
 
-    const claimTx = await contractAsSignerReceiver2.claim(
+    const claimTx = await contractAsSignerReceiver.claim(
       0, // _transactionID
       {
         value: '120000000000000000', // 0.12eth
@@ -254,7 +254,7 @@ describe('Feature', function () {
   });
 
   it('Should give the arbitration fee and the total deposit to the challenger after a successful challenge', async function () {
-    const createTransactionTx = await contractAsSignerSender4.createTransaction(
+    const createTransactionTx = await contractAsSignerSender.createTransaction(
       arbitrator.address,
       0x00,
       '100000000000000000', // _deposit for claim : 0.1eth => 10% of amount
@@ -267,7 +267,7 @@ describe('Feature', function () {
     );
 
     // Claim
-    const claimTx = await contractAsSignerReceiver3.claim(
+    const claimTx = await contractAsSignerReceiver.claim(
       0, // _transactionID
       {
         value: '120000000000000000', // 0.12eth
@@ -276,7 +276,7 @@ describe('Feature', function () {
     );
 
     // Challenge claim
-    const challengeClaimTx = await contractAsSignerChallenger0.challengeClaim(
+    const challengeClaimTx = await contractAsSignerChallenger.challengeClaim(
       0, // _claimID
       {
         value: '120000000000000000', // 0.12eth
@@ -311,19 +311,19 @@ describe('Feature', function () {
     // Claim status switch to Resolved.
     expect(parseInt(claim.status)).to.equal(2);
 
-    const newBalanceChallenger0Expected = new ethers.BigNumber.from(
-      '10000000000000000000000',
+    const newBalanceChallengerExpected = new ethers.BigNumber.from(
+      '1000000000000000000000',
     )
       .sub(gasFeeChallengeClaimTx)
       .add('100000000000000000');
 
     expect(
-      (await provider.getBalance(challenger0.address)).toString(),
-    ).to.equal(newBalanceChallenger0Expected.toString());
+      (await provider.getBalance(challenger.address)).toString(),
+    ).to.equal(newBalanceChallengerExpected.toString());
   });
 
   it('Should give the amount of the total deposit to the claimer after a aborted challenge', async function () {
-    const createTransactionTx = await contractAsSignerSender5.createTransaction(
+    const createTransactionTx = await contractAsSignerSender.createTransaction(
       arbitrator.address,
       0x00,
       '100000000000000000', // _deposit for claim : 0.1eth => 10% of amount
@@ -336,7 +336,7 @@ describe('Feature', function () {
     );
 
     // Claim
-    const claimTx = await contractAsSignerReceiver4.claim(
+    const claimTx = await contractAsSignerReceiver.claim(
       0, // _transactionID
       {
         value: '120000000000000000', // 0.12eth
@@ -352,7 +352,7 @@ describe('Feature', function () {
       .mul(150000000000);
 
     // Challenge claim
-    const challengeClaimTx = await contractAsSignerChallenger1.challengeClaim(
+    const challengeClaimTx = await contractAsSignerChallenger.challengeClaim(
       0, // _claimID
       {
         value: '120000000000000000', // 0.12eth
@@ -377,19 +377,19 @@ describe('Feature', function () {
       1, // Ruling for the challenger
     );
 
-    const newBalanceReceiver4Expected = new ethers.BigNumber.from(
-      '10000000000000000000000',
+    const newBalanceReceiverExpected = new ethers.BigNumber.from(
+      '1000000000000000000000',
     )
       .sub(gasFeeClaimTx)
       .sub('20000000000000000');
 
-    expect((await provider.getBalance(receiver4.address)).toString()).to.equal(
-      newBalanceReceiver4Expected.toString(),
+    expect((await provider.getBalance(receiver.address)).toString()).to.equal(
+      newBalanceReceiverExpected.toString(),
     );
   });
 
   it('Should give the amount of the total deposit to the claimer after a successful appeal', async function () {
-    const createTransactionTx = await contractAsSignerSender6.createTransaction(
+    const createTransactionTx = await contractAsSignerSender.createTransaction(
       arbitrator.address,
       0x00,
       '100000000000000000', // _deposit for claim : 0.1eth => 10% of amount
@@ -402,7 +402,7 @@ describe('Feature', function () {
     );
 
     // Claim
-    const claimTx = await contractAsSignerReceiver5.claim(
+    const claimTx = await contractAsSignerReceiver.claim(
       0, // _transactionID
       {
         value: '120000000000000000', // 0.12eth
@@ -418,7 +418,7 @@ describe('Feature', function () {
       .mul(150000000000);
 
     // Challenge claim
-    const challengeClaimTx = await contractAsSignerChallenger2.challengeClaim(
+    const challengeClaimTx = await contractAsSignerChallenger.challengeClaim(
       0, // _claimID
       {
         value: '120000000000000000', // 0.12eth
@@ -435,7 +435,7 @@ describe('Feature', function () {
     );
 
     // Appeal
-    const appealTx = await contractAsSignerReceiver5.appeal(
+    const appealTx = await contractAsSignerReceiver.appeal(
       0, // _claimID
       {
         value: '20000000000000000', // 0.2eth
@@ -465,21 +465,21 @@ describe('Feature', function () {
     expect((await contractAsSignerJuror.disputes(0)).status).to.equal(2);
     expect((await contractAsSignerJuror.disputes(0)).ruling).to.equal(1);
 
-    const newBalanceReceiver5Expected = new ethers.BigNumber.from(
-      '10000000000000000000000',
+    const newBalanceReceiverExpected = new ethers.BigNumber.from(
+      '1000000000000000000000',
     )
       .sub(gasFeeClaimTx)
       .sub(gasFeeAppealTx)
       .sub('40000000000000000');
 
-    expect((await provider.getBalance(receiver5.address)).toString()).to.equal(
-      newBalanceReceiver5Expected.toString(),
+    expect((await provider.getBalance(receiver.address)).toString()).to.equal(
+      newBalanceReceiverExpected.toString(),
     );
   });
 
   // Scenario: 2 claimers, the first one get the reward.
   it('Should give the amount of the first claimer who claim in multiple successful claims', async function () {
-    const createTransactionTx = await contractAsSignerSender7.createTransaction(
+    const createTransactionTx = await contractAsSignerSender.createTransaction(
       arbitrator.address,
       0x00,
       '100000000000000000', // _deposit for claim : 0.1eth => 10% of amount
@@ -489,7 +489,7 @@ describe('Feature', function () {
     );
 
     // 1st claim
-    const claimTx1 = await contractAsSignerReceiver6.claim(
+    const claimTx1 = await contractAsSignerReceiver1.claim(
       0, // _transactionID
       {
         value: '120000000000000000', // 0.12eth
@@ -504,7 +504,7 @@ describe('Feature', function () {
       .mul(150000000000);
 
     // 2nd claim
-    const claimTx2 = await contractAsSignerReceiver7.claim(
+    const claimTx2 = await contractAsSignerReceiver2.claim(
       0, // _transactionID
       {
         value: '120000000000000000', // 0.12eth
@@ -527,24 +527,24 @@ describe('Feature', function () {
       0, // _claimID
     );
 
-    const newBalanceReceiver6Expected = new ethers.BigNumber.from(
-      '10000000000000000000000',
+    const newBalanceReceiver1Expected = new ethers.BigNumber.from(
+      '1000000000000000000000',
     ).sub(gasFeeClaimTx1);
 
-    const newBalanceReceiver7Expected = new ethers.BigNumber.from(
-      '10000000000000000000000',
+    const newBalanceReceiver2Expected = new ethers.BigNumber.from(
+      '1000000000000000000000',
     )
       .sub(gasFeeClaimTx2)
       .sub(ethers.BigNumber.from('120000000000000000')); // Claim's value
 
     // First claimer should receive the payment
-    expect((await provider.getBalance(receiver6.address)).toString()).to.equal(
-      newBalanceReceiver6Expected.toString(),
+    expect((await provider.getBalance(receiver1.address)).toString()).to.equal(
+      newBalanceReceiver1Expected.toString(),
     );
 
     // Second claimer must not receive the payment
-    expect((await provider.getBalance(receiver7.address)).toString()).to.equal(
-      newBalanceReceiver7Expected.toString(),
+    expect((await provider.getBalance(receiver2.address)).toString()).to.equal(
+      newBalanceReceiver2Expected.toString(),
     );
   });
 });
