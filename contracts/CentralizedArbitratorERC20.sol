@@ -11,6 +11,8 @@
 
 pragma solidity ^0.8.7;
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 /** @title IArbitrable
  *  Arbitrable interface.
  *  When developing arbitrable contracts, we need to:
@@ -213,9 +215,10 @@ abstract contract Arbitrator {
 /** @title Centralized Arbitrator
  *  @dev This is a centralized arbitrator deciding alone on the result of disputes. No appeals are possible.
  */
-contract CentralizedArbitrator is Arbitrator {
+contract CentralizedArbitratorERC20 is Arbitrator {
     address public owner = msg.sender;
     uint256 arbitrationPrice; // Not public because arbitrationCost already acts as an accessor.
+    uint public rulingTime;
     uint256 constant NOT_PAYABLE_VALUE = (2**256 - 2) / 2; // High value to be sure that the appeal is too expensive.
 
     struct DisputeStruct {
@@ -233,13 +236,14 @@ contract CentralizedArbitrator is Arbitrator {
 
     DisputeStruct[] public disputes;
 
-    /** @dev Constructor. Set the initial arbitration price.
+    /** @dev Constructor. Set the initial arbitration price & ruling time
      *  @param _arbitrationPrice Amount to be paid for arbitration.
+     *  @param _rulingTime Time befor ruling get executed
      */
-    constructor(uint256 _arbitrationPrice) {
+    constructor(uint256 _arbitrationPrice, uint256 _rulingTime) {
         arbitrationPrice = _arbitrationPrice;
+        rulingTime = _rulingTime;
     }
-
     /** @dev Set the arbitration price. Only callable by the owner.
      *  @param _arbitrationPrice Amount to be paid for arbitration.
      */
