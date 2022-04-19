@@ -1,7 +1,7 @@
 const { expect } = require('chai');
 
 const provider = ethers.provider;
-let erc20Mock, featureERC20, feature, arbitrator;
+let erc20Mock, featureERC20, arbitrator, arbitratorWithoutAppeal;
 let deployer;
 let contractAsSignerDeployer;
 let sender, receiver, receiver1, receiver2, challenger;
@@ -30,22 +30,28 @@ beforeEach(async () => {
   // Get the ContractFactory and Signers here.
   const ERC20Mock = await ethers.getContractFactory('ERC20Mock');
   const FeatureERC20 = await ethers.getContractFactory('FeatureERC20');
-  const CentralizedArbitrator = await ethers.getContractFactory(
+  const CentralizedAppealableArbitrator = await ethers.getContractFactory(
+    'CentralizedAppealableArbitrator',
+  );
+  const CentralizedArbitratorERC20 = await ethers.getContractFactory(
     'CentralizedArbitratorERC20',
   );
 
   featureERC20 = await FeatureERC20.deploy();
-  arbitrator = await CentralizedArbitrator.deploy('20000000000000000', '42'); // 0.02 ether, 42s
+  arbitratorAppealable = await CentralizedAppealableArbitrator.deploy('20000000000000000', '42'); // 0.02 ether, 42s
+  arbitratorERC20 = await CentralizedArbitratorERC20.deploy('20000000000000000', '42')
   erc20Mock = await ERC20Mock.deploy();
 
   await erc20Mock.deployed();
   await featureERC20.deployed();
-  await arbitrator.deployed();
+  await arbitratorAppealable.deployed();
+  await arbitratorERC20.deployed();
 
   [deployer] = await ethers.getSigners();
   contractAsSignerERC20Deployer = erc20Mock.connect(deployer);
   contractAsSignerDeployer = featureERC20.connect(deployer);
-  contractAsSignerJuror = arbitrator.connect(deployer);
+  contractAsSignerJurorAppealable = arbitratorAppealable.connect(deployer);
+  contractAsSignerJuror = arbitratorERC20.connect(deployer);
 
   const initializeTx = await contractAsSignerDeployer.initialize();
 
@@ -106,7 +112,7 @@ describe('Feature ERC20', () => {
     );
 
     const createTransactionTx = await contractAsSignerSender.createTransaction(
-      arbitrator.address,
+      arbitratorAppealable.address,
       0x00,
       erc20Mock.address,
       100,
@@ -172,7 +178,7 @@ describe('Feature ERC20', () => {
     );
 
     const createTransactionTx = await contractAsSignerSender.createTransaction(
-      arbitrator.address,
+      arbitratorAppealable.address,
       0x00,
       erc20Mock.address,
       100,
@@ -216,7 +222,7 @@ describe('Feature ERC20', () => {
     );
 
     const createTransactionTx = await contractAsSignerSender.createTransaction(
-      arbitrator.address,
+      arbitratorAppealable.address,
       0x00,
       erc20Mock.address,
       100,
@@ -264,7 +270,7 @@ describe('Feature ERC20', () => {
     );
 
     const createTransactionTx = await contractAsSignerSender.createTransaction(
-      arbitrator.address,
+      arbitratorAppealable.address,
       0x00,
       erc20Mock.address,
       100,
@@ -312,7 +318,7 @@ describe('Feature ERC20', () => {
     );
 
     const createTransactionTx = await contractAsSignerSender.createTransaction(
-      arbitrator.address,
+      arbitratorAppealable.address,
       0x00,
       erc20Mock.address,
       100,
@@ -352,7 +358,7 @@ describe('Feature ERC20', () => {
       .mul(150000000000);
 
     // Give ruling
-    await contractAsSignerJuror.giveRuling(
+    await contractAsSignerJurorAppealable.giveRuling(
       0, // _disputeID
       2, // Ruling for the challenger
     );
@@ -361,7 +367,7 @@ describe('Feature ERC20', () => {
     await network.provider.send('evm_mine');
 
     // Execute ruling
-    await contractAsSignerJuror.giveRuling(
+    await contractAsSignerJurorAppealable.giveRuling(
       0, // _disputeID
       2, // Ruling for the challenger
     );
@@ -398,7 +404,7 @@ describe('Feature ERC20', () => {
     await createAllowERC20Tx.wait();
 
     const createTransactionTx = await contractAsSignerSender.createTransaction(
-      arbitrator.address,
+      arbitratorAppealable.address,
       0x00,
       erc20Mock.address,
       100,
@@ -434,7 +440,7 @@ describe('Feature ERC20', () => {
     );
 
     // Give ruling
-    await contractAsSignerJuror.giveRuling(
+    await contractAsSignerJurorAppealable.giveRuling(
       0, // _disputeID
       1, // Ruling for the receiver
     );
@@ -443,7 +449,7 @@ describe('Feature ERC20', () => {
     await network.provider.send('evm_mine');
 
     // Execute ruling
-    await contractAsSignerJuror.giveRuling(
+    await contractAsSignerJurorAppealable.giveRuling(
       0, // _disputeID
       1, // Ruling for the receiver
     );
@@ -475,7 +481,7 @@ describe('Feature ERC20', () => {
     await createAllowERC20Tx.wait();
 
     const createTransactionTx = await contractAsSignerSender.createTransaction(
-      arbitrator.address,
+      arbitratorAppealable.address,
       0x00,
       erc20Mock.address,
       100,
@@ -513,7 +519,7 @@ describe('Feature ERC20', () => {
     await challengeClaimTx.wait();
 
     // Give ruling
-    const giveRulingTx = await contractAsSignerJuror.giveRuling(
+    const giveRulingTx = await contractAsSignerJurorAppealable.giveRuling(
       0, // _disputeID
       2, // Ruling for the challenger
     );
@@ -527,8 +533,8 @@ describe('Feature ERC20', () => {
       },
     );
 
-    expect((await contractAsSignerJuror.disputes(0)).status).to.equal(1);
-    expect((await contractAsSignerJuror.disputes(0)).isAppealed).to.true;
+    expect((await contractAsSignerJurorAppealable.disputes(0)).status).to.equal(1);
+    expect((await contractAsSignerJurorAppealable.disputes(0)).isAppealed).to.true;
 
     // Wait until the transaction is mined
     const transactionMinedAppealTx = await appealTx.wait();
@@ -541,13 +547,13 @@ describe('Feature ERC20', () => {
     await network.provider.send('evm_mine'); // this one will have 100s more
 
     // Execute ruling
-    await contractAsSignerJuror.giveRuling(
+    await contractAsSignerJurorAppealable.giveRuling(
       0, // _disputeID
       1, // Ruling for the receiver
     );
 
-    expect((await contractAsSignerJuror.disputes(0)).status).to.equal(2);
-    expect((await contractAsSignerJuror.disputes(0)).ruling).to.equal(1);
+    expect((await contractAsSignerJurorAppealable.disputes(0)).status).to.equal(2);
+    expect((await contractAsSignerJurorAppealable.disputes(0)).ruling).to.equal(1);
 
     const newBalanceReceiverExpected = new ethers.BigNumber.from(
       '1000000000000000000000',
@@ -578,7 +584,7 @@ describe('Feature ERC20', () => {
     await createAllowERC20Tx.wait();
 
     const createTransactionTx = await contractAsSignerSender.createTransaction(
-      arbitrator.address,
+      arbitratorAppealable.address,
       0x00,
       erc20Mock.address,
       100,
