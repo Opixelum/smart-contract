@@ -28,19 +28,25 @@ beforeEach(async function () {
   // Get the ContractFactory and Signers here.
   // TODO: deploy an Arbitrator
   const Feature = await ethers.getContractFactory('Feature');
-  const CentralizedArbitrator = await ethers.getContractFactory(
+  const CentralizedAppealableArbitrator = await ethers.getContractFactory(
     'CentralizedAppealableArbitrator',
+  );
+  const CentralizedArbitrator = await ethers.getContractFactory(
+    'CentralizedArbitrator',
   );
 
   feature = await Feature.deploy();
+  arbitratorAppealable = await CentralizedAppealableArbitrator.deploy('20000000000000000', '42'); // 0.02 ether, 42s
   arbitrator = await CentralizedArbitrator.deploy('20000000000000000', '42'); // 0.02 ether, 42s
 
   await feature.deployed();
+  await arbitratorAppealable.deployed()
   await arbitrator.deployed();
 
   [deployer] = await ethers.getSigners();
   contractAsSignerDeployer = feature.connect(deployer);
-  contractAsSignerJuror = arbitrator.connect(deployer);
+  contractAsSignerJurorAppealable = arbitratorAppealable.connect(deployer);
+  contractAsSignerJuror= arbitrator.connect(deployer);
 
   const initializeTx = await contractAsSignerDeployer.initialize();
 
@@ -255,7 +261,7 @@ describe('Feature', function () {
 
   it('Should give the arbitration fee and the total deposit to the challenger after a successful challenge', async function () {
     const createTransactionTx = await contractAsSignerSender.createTransaction(
-      arbitrator.address,
+      arbitratorAppealable.address,
       0x00,
       '100000000000000000', // _deposit for claim : 0.1eth => 10% of amount
       '864000', // _timeoutPayment => 10 days
@@ -292,7 +298,7 @@ describe('Feature', function () {
       .mul(150000000000);
 
     // Give ruling
-    await contractAsSignerJuror.giveRuling(
+    await contractAsSignerJurorAppealable.giveRuling(
       0, // _disputeID
       2, // Ruling for the challenger
     );
@@ -301,7 +307,7 @@ describe('Feature', function () {
     await network.provider.send('evm_mine'); // this one will have 100s more
 
     // Execute ruling
-    await contractAsSignerJuror.giveRuling(
+    await contractAsSignerJurorAppealable.giveRuling(
       0, // _disputeID
       2, // Ruling for the challenger
     );
@@ -324,7 +330,7 @@ describe('Feature', function () {
 
   it('Should give the amount of the total deposit to the claimer after a aborted challenge', async function () {
     const createTransactionTx = await contractAsSignerSender.createTransaction(
-      arbitrator.address,
+      arbitratorAppealable.address,
       0x00,
       '100000000000000000', // _deposit for claim : 0.1eth => 10% of amount
       '864000', // _timeoutPayment => 10 days
@@ -363,7 +369,7 @@ describe('Feature', function () {
     await challengeClaimTx.wait();
 
     // Give ruling
-    const giveRulingTx = await contractAsSignerJuror.giveRuling(
+    const giveRulingTx = await contractAsSignerJurorAppealable.giveRuling(
       0, // _disputeID
       1, // Ruling for the receiver
     );
@@ -372,7 +378,7 @@ describe('Feature', function () {
     await network.provider.send('evm_mine'); // this one will have 100s more
 
     // Execute ruling
-    await contractAsSignerJuror.giveRuling(
+    await contractAsSignerJurorAppealable.giveRuling(
       0, // _disputeID
       1, // Ruling for the challenger
     );
@@ -390,7 +396,7 @@ describe('Feature', function () {
 
   it('Should give the amount of the total deposit to the claimer after a successful appeal', async function () {
     const createTransactionTx = await contractAsSignerSender.createTransaction(
-      arbitrator.address,
+      arbitratorAppealable.address,
       0x00,
       '100000000000000000', // _deposit for claim : 0.1eth => 10% of amount
       '864000', // _timeoutPayment => 10 days
@@ -429,7 +435,7 @@ describe('Feature', function () {
     await challengeClaimTx.wait();
 
     // Give ruling
-    const giveRulingTx = await contractAsSignerJuror.giveRuling(
+    const giveRulingTx = await contractAsSignerJurorAppealable.giveRuling(
       0, // _disputeID
       2, // Ruling for the challenger
     );
@@ -443,8 +449,8 @@ describe('Feature', function () {
       },
     );
 
-    expect((await contractAsSignerJuror.disputes(0)).status).to.equal(1);
-    expect((await contractAsSignerJuror.disputes(0)).isAppealed).to.true;
+    expect((await contractAsSignerJurorAppealable.disputes(0)).status).to.equal(1);
+    expect((await contractAsSignerJurorAppealable.disputes(0)).isAppealed).to.true;
 
     // Wait until the transaction is mined
     const transactionMinedAppealTx = await appealTx.wait();
@@ -457,13 +463,13 @@ describe('Feature', function () {
     await network.provider.send('evm_mine'); // this one will have 100s more
 
     // Execute ruling
-    await contractAsSignerJuror.giveRuling(
+    await contractAsSignerJurorAppealable.giveRuling(
       0, // _disputeID
       1, // Ruling for the receiver
     );
 
-    expect((await contractAsSignerJuror.disputes(0)).status).to.equal(2);
-    expect((await contractAsSignerJuror.disputes(0)).ruling).to.equal(1);
+    expect((await contractAsSignerJurorAppealable.disputes(0)).status).to.equal(2);
+    expect((await contractAsSignerJurorAppealable.disputes(0)).ruling).to.equal(1);
 
     const newBalanceReceiverExpected = new ethers.BigNumber.from(
       '1000000000000000000000',
@@ -549,25 +555,9 @@ describe('Feature', function () {
   });
 
   it('Should revert transaction when trying to appeal a not appealable arbitrator contract', async () => {
-    const createTransferTx = await contractAsSignerERC20Deployer.transfer(
-      sender.address,
-      100,
-    );
-
-    await createTransferTx.wait();
-
-    const createAllowERC20Tx = await contractAsSenderERC20Deployer.approve(
-      featureERC20.address,
-      100,
-    );
-
-    await createAllowERC20Tx.wait();
-
     const createTransactionTx = await contractAsSignerSender.createTransaction(
-      arbitratorERC20.address,
+      arbitrator.address,
       0x00,
-      erc20Mock.address,
-      100,
       '100000000000000000', // _deposit for claim : 0.1eth => 10% of amount
       '864000', // _timeoutPayment => 10 days
       '259200', // _challengePeriod => 3 days
