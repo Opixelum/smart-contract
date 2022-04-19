@@ -12,7 +12,6 @@
 pragma solidity ^0.8.7;
 
 /** @title IArbitrable
- *  @author Enrique Piqueras - <enrique@kleros.io>
  *  Arbitrable interface.
  *  When developing arbitrable contracts, we need to:
  *  -Define the action taken when a ruling is received by the contract. We should do so in executeRuling.
@@ -69,7 +68,6 @@ interface IArbitrable {
 }
 
 /** @title Arbitrable
- *  @author Clément Lesaege - <clement@lesaege.com>
  *  Arbitrable abstract contract.
  *  When developing arbitrable contracts, we need to:
  *  -Define the action taken when a ruling is received by the contract. We should do so in executeRuling.
@@ -114,7 +112,6 @@ abstract contract Arbitrable is IArbitrable {
 }
 
 /** @title Arbitrator
- *  @author Clément Lesaege - <clement@lesaege.com>
  *  Arbitrator abstract contract.
  *  When developing arbitrator contracts we need to:
  *  -Define the functions for dispute creation (createDispute) and appeal (appeal). Don't forget to store the arbitrated contract and the disputeID (which should be unique, use nbDisputes).
