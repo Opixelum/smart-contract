@@ -38,8 +38,14 @@ beforeEach(async () => {
   );
 
   featureERC20 = await FeatureERC20.deploy();
-  arbitratorAppealable = await CentralizedAppealableArbitrator.deploy('20000000000000000', '42'); // 0.02 ether, 42s
-  arbitratorERC20 = await CentralizedArbitratorERC20.deploy('20000000000000000', '42')
+  arbitratorAppealable = await CentralizedAppealableArbitrator.deploy(
+    '20000000000000000',
+    '42',
+  ); // 0.02 ether, 42s
+  arbitratorERC20 = await CentralizedArbitratorERC20.deploy(
+    '20000000000000000',
+    '42',
+  );
   erc20Mock = await ERC20Mock.deploy();
 
   await erc20Mock.deployed();
@@ -533,8 +539,11 @@ describe('Feature ERC20', () => {
       },
     );
 
-    expect((await contractAsSignerJurorAppealable.disputes(0)).status).to.equal(1);
-    expect((await contractAsSignerJurorAppealable.disputes(0)).isAppealed).to.true;
+    expect((await contractAsSignerJurorAppealable.disputes(0)).status).to.equal(
+      1,
+    );
+    expect((await contractAsSignerJurorAppealable.disputes(0)).isAppealed).to
+      .true;
 
     // Wait until the transaction is mined
     const transactionMinedAppealTx = await appealTx.wait();
@@ -552,8 +561,12 @@ describe('Feature ERC20', () => {
       1, // Ruling for the receiver
     );
 
-    expect((await contractAsSignerJurorAppealable.disputes(0)).status).to.equal(2);
-    expect((await contractAsSignerJurorAppealable.disputes(0)).ruling).to.equal(1);
+    expect((await contractAsSignerJurorAppealable.disputes(0)).status).to.equal(
+      2,
+    );
+    expect((await contractAsSignerJurorAppealable.disputes(0)).ruling).to.equal(
+      1,
+    );
 
     const newBalanceReceiverExpected = new ethers.BigNumber.from(
       '1000000000000000000000',
@@ -713,6 +726,8 @@ describe('Feature ERC20', () => {
       2, // Ruling for the challenger
     );
 
-    expect((await contractAsSignerJuror.appealCost(0))).to.be.above(await provider.getBalance(receiver.address))
+    expect(await contractAsSignerJuror.appealCost(0)).to.be.above(
+      await provider.getBalance(receiver.address),
+    );
   });
 });

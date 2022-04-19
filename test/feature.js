@@ -36,17 +36,20 @@ beforeEach(async function () {
   );
 
   feature = await Feature.deploy();
-  arbitratorAppealable = await CentralizedAppealableArbitrator.deploy('20000000000000000', '42'); // 0.02 ether, 42s
+  arbitratorAppealable = await CentralizedAppealableArbitrator.deploy(
+    '20000000000000000',
+    '42',
+  ); // 0.02 ether, 42s
   arbitrator = await CentralizedArbitrator.deploy('20000000000000000', '42'); // 0.02 ether, 42s
 
   await feature.deployed();
-  await arbitratorAppealable.deployed()
+  await arbitratorAppealable.deployed();
   await arbitrator.deployed();
 
   [deployer] = await ethers.getSigners();
   contractAsSignerDeployer = feature.connect(deployer);
   contractAsSignerJurorAppealable = arbitratorAppealable.connect(deployer);
-  contractAsSignerJuror= arbitrator.connect(deployer);
+  contractAsSignerJuror = arbitrator.connect(deployer);
 
   const initializeTx = await contractAsSignerDeployer.initialize();
 
@@ -449,8 +452,11 @@ describe('Feature', function () {
       },
     );
 
-    expect((await contractAsSignerJurorAppealable.disputes(0)).status).to.equal(1);
-    expect((await contractAsSignerJurorAppealable.disputes(0)).isAppealed).to.true;
+    expect((await contractAsSignerJurorAppealable.disputes(0)).status).to.equal(
+      1,
+    );
+    expect((await contractAsSignerJurorAppealable.disputes(0)).isAppealed).to
+      .true;
 
     // Wait until the transaction is mined
     const transactionMinedAppealTx = await appealTx.wait();
@@ -468,8 +474,12 @@ describe('Feature', function () {
       1, // Ruling for the receiver
     );
 
-    expect((await contractAsSignerJurorAppealable.disputes(0)).status).to.equal(2);
-    expect((await contractAsSignerJurorAppealable.disputes(0)).ruling).to.equal(1);
+    expect((await contractAsSignerJurorAppealable.disputes(0)).status).to.equal(
+      2,
+    );
+    expect((await contractAsSignerJurorAppealable.disputes(0)).ruling).to.equal(
+      1,
+    );
 
     const newBalanceReceiverExpected = new ethers.BigNumber.from(
       '1000000000000000000000',
@@ -597,6 +607,8 @@ describe('Feature', function () {
       2, // Ruling for the challenger
     );
 
-    expect((await contractAsSignerJuror.appealCost(0))).to.be.above(await provider.getBalance(receiver.address))
+    expect(await contractAsSignerJuror.appealCost(0)).to.be.above(
+      await provider.getBalance(receiver.address),
+    );
   });
 });
