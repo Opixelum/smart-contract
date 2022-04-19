@@ -1,7 +1,7 @@
 const { expect } = require('chai');
 
 const provider = ethers.provider;
-let erc20Mock, featureERC20, arbitrator, arbitratorWithoutAppeal;
+let erc20Mock, featureERC20;
 let deployer;
 let contractAsSignerDeployer;
 let sender, receiver, receiver1, receiver2, challenger;
@@ -652,5 +652,67 @@ describe('Feature ERC20', () => {
     expect((await provider.getBalance(receiver2.address)).toString()).to.equal(
       newBalanceReceiver2Expected.toString(),
     );
+  });
+
+  it('Should revert transaction when trying to appeal a not appealable arbitrator contract', async () => {
+    const createTransferTx = await contractAsSignerERC20Deployer.transfer(
+      sender.address,
+      100,
+    );
+
+    await createTransferTx.wait();
+
+    const createAllowERC20Tx = await contractAsSenderERC20Deployer.approve(
+      featureERC20.address,
+      100,
+    );
+
+    await createAllowERC20Tx.wait();
+
+    const createTransactionTx = await contractAsSignerSender.createTransaction(
+      arbitratorERC20.address,
+      0x00,
+      erc20Mock.address,
+      100,
+      '100000000000000000', // _deposit for claim : 0.1eth => 10% of amount
+      '864000', // _timeoutPayment => 10 days
+      '259200', // _challengePeriod => 3 days
+      '', // _metaEvidence
+    );
+
+    // Claim
+    const claimTx = await contractAsSignerReceiver.claim(
+      0, // _transactionID
+      {
+        value: '120000000000000000', // 0.12eth
+        gasPrice: 150000000000,
+      },
+    );
+
+    // Wait until the transaction is mined
+    const transactionMinedClaimTx = await claimTx.wait();
+
+    const gasFeeClaimTx = transactionMinedClaimTx.gasUsed
+      .valueOf()
+      .mul(150000000000);
+
+    // Challenge claim
+    const challengeClaimTx = await contractAsSignerChallenger.challengeClaim(
+      0, // _claimID
+      {
+        value: '120000000000000000', // 0.12eth
+        gasPrice: 150000000000,
+      },
+    );
+
+    await challengeClaimTx.wait();
+
+    // Give ruling
+    const giveRulingTx = await contractAsSignerJuror.giveRuling(
+      0, // _disputeID
+      2, // Ruling for the challenger
+    );
+
+    expect((await contractAsSignerJuror.appealCost(0))).to.be.above(await provider.getBalance(receiver.address))
   });
 });

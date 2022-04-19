@@ -132,7 +132,7 @@ abstract contract Arbitrator {
         _;
     }
     modifier requireAppealFee(uint256 _disputeID, bytes calldata _extraData) {
-        require(msg.value >= appealCost(_disputeID, _extraData), "Not enough ETH to cover appeal costs.");
+        require(msg.value >= appealCost(_disputeID), "Not enough ETH to cover appeal costs.");
         _;
     }
 
@@ -188,10 +188,9 @@ abstract contract Arbitrator {
 
     /** @dev Compute the cost of appeal. It is recommended not to increase it often, as it can be higly time and gas consuming for the arbitrated contracts to cope with fee augmentation.
      *  @param _disputeID ID of the dispute to be appealed.
-     *  @param _extraData Can be used to give additional info on the dispute to be created.
      *  @return fee Amount to be paid.
      */
-    function appealCost(uint256 _disputeID, bytes calldata _extraData) public view virtual returns (uint256 fee);
+    function appealCost(uint256 _disputeID) public view virtual returns (uint256 fee);
 
     /** @dev Compute the start and end of the dispute's current or next appeal period, if possible.
      *  @param _disputeID ID of the dispute.
@@ -261,10 +260,9 @@ contract CentralizedArbitratorERC20 is Arbitrator {
 
     /** @dev Cost of appeal. Since it is not possible, it's a high value which can never be paid.
      *  @param _disputeID ID of the dispute to be appealed. Not used by this contract.
-     *  @param _extraData Not used by this contract.
      *  @return fee Amount to be paid.
      */
-    function appealCost(uint256 _disputeID, bytes calldata _extraData) public pure override returns (uint256 fee) {
+    function appealCost(uint256 _disputeID) public pure override returns (uint256 fee) {
         return NOT_PAYABLE_VALUE;
     }
 
